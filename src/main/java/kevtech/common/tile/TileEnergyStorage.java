@@ -25,9 +25,14 @@ public class TileEnergyStorage extends TileEntity implements IEnergyHandler {
 		output = ForgeDirection.EAST;
 	}
 
+	public TileEnergyStorage(int maxEnergy, int maxIn, int maxOut) {
+		energy = new EnergyStorage(maxEnergy, maxIn, maxOut);
+		output = ForgeDirection.EAST;
+	}
+
 	@Override
 	public void updateEntity() {
-		System.out.println(energy.getEnergyStored());
+		System.out.println("ENERGY STORAGE" + energy.getEnergyStored());
 		doExtract(getWorldObj());
 		doReceive(getWorldObj());
 		System.out.println("Updating");
@@ -35,15 +40,15 @@ public class TileEnergyStorage extends TileEntity implements IEnergyHandler {
 
 	protected void doReceive(World w) {
 		for (ForgeDirection f : ForgeDirection.VALID_DIRECTIONS) {
-			if (f != output) {
-				TileEntity t = w.getTileEntity(xCoord + f.offsetX, yCoord + f.offsetY, zCoord + f.offsetZ);
-				if (t instanceof IEnergyProvider) {
-					IEnergyProvider p = (IEnergyProvider) t;
-					int extracted = p.extractEnergy(f.getOpposite(), energy.getMaxReceive(), true);
-					int recieved = energy.receiveEnergy(extracted, false);
-					p.extractEnergy(f, recieved, false);
-				}
+			// if (f != output) {
+			TileEntity t = w.getTileEntity(xCoord + f.offsetX, yCoord + f.offsetY, zCoord + f.offsetZ);
+			if (t instanceof IEnergyProvider) {
+				IEnergyProvider p = (IEnergyProvider) t;
+				int extracted = p.extractEnergy(f.getOpposite(), energy.getMaxReceive(), true);
+				int recieved = energy.receiveEnergy(extracted, false);
+				p.extractEnergy(f, recieved, false);
 			}
+			// }
 		}
 	}
 
@@ -60,13 +65,27 @@ public class TileEnergyStorage extends TileEntity implements IEnergyHandler {
 
 	@Override
 	public boolean canConnectEnergy(ForgeDirection from) {
-		// TODO Auto-generated method stub
+		TileEntity t = worldObj.getTileEntity(xCoord + from.offsetX, yCoord + from.offsetY, xCoord + from.offsetZ);
+		if (from.getOpposite() == output && t instanceof IEnergyReceiver)
+			return true;
+		if (from.getOpposite() != output && t instanceof IEnergyProvider)
+			return true;
 		return false;
 	}
 
 	@Override
 	public int receiveEnergy(ForgeDirection from, int maxReceive, boolean simulate) {
-		// TODO Auto-generated method stub
+		if (from.getOpposite() != output) {
+			TileEntity t = worldObj.getTileEntity(xCoord + from.offsetX, yCoord + from.offsetY, xCoord + from.offsetZ);
+			if (t instanceof IEnergyProvider) {
+				IEnergyProvider p = (IEnergyProvider) t;
+				int extracted = p.extractEnergy(from.getOpposite(), energy.getMaxReceive(), true);
+				int recieved = energy.receiveEnergy(extracted, false);
+				p.extractEnergy(from, recieved, false);
+
+			}
+		}
+
 		return 0;
 	}
 
