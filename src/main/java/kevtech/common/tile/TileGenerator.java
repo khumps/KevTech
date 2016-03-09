@@ -1,5 +1,6 @@
 package kevtech.common.tile;
 
+import cofh.api.energy.IEnergyProvider;
 import cofh.api.energy.IEnergyReceiver;
 import kevtech.Coord3D;
 import kevtech.Utils;
@@ -10,11 +11,11 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
 
-public class TileGenerator extends TileEnergyStorage implements IInventory {
+public class TileGenerator extends TileEnergyStorage implements IInventory, IEnergyProvider {
 
 	private ItemStack[] inventory;
 	private boolean running = true;
-	private int runTime = 2000000;
+	private int runTime = 200;
 	private static final int RF_PER_TICK = 100;
 	private Coord3D coord;
 
@@ -24,39 +25,61 @@ public class TileGenerator extends TileEnergyStorage implements IInventory {
 	}
 
 	public void updateEntity() {
-		System.out.println("GENERATOR" + energy.getEnergyStored());
 		generate();
 		doExtract(getWorldObj());
 	}
 
 	protected void doExtract(World w) {
-		for (ForgeDirection f : ForgeDirection.VALID_DIRECTIONS) {
-			TileEntity t = w.getTileEntity(xCoord + f.offsetX, yCoord + f.offsetY, zCoord + f.offsetZ);
-			coord = new Coord3D(xCoord + f.offsetX, yCoord + f.offsetY, zCoord + f.offsetZ);
-			System.out.println(coord.toString());
-			if (t instanceof IEnergyReceiver) {
-				IEnergyReceiver r = (IEnergyReceiver) t;
-				int extracted = energy.extractEnergy(energy.getMaxExtract(), true);
-				int received = r.receiveEnergy(f.getOpposite(), extracted, false);
-				energy.extractEnergy(received, false);
+		if (!worldObj.isRemote) {
+			for (ForgeDirection f : ForgeDirection.VALID_DIRECTIONS) {
+				TileEntity t = w.getTileEntity(xCoord + f.offsetX, yCoord + f.offsetY, zCoord + f.offsetZ);
+				coord = new Coord3D(xCoord + f.offsetX, yCoord + f.offsetY, zCoord + f.offsetZ);
+				if (t instanceof IEnergyReceiver) {
+					IEnergyReceiver r = (IEnergyReceiver) t;
+					int extracted = energy.extractEnergy(energy.getMaxExtract(), true);
+					int received = r.receiveEnergy(f.getOpposite(), extracted, false);
+					energy.extractEnergy(received, false);
+				}
 			}
 		}
 	}
 
 	protected void generate() {
-		if (running) {
-			energy.receiveEnergy(RF_PER_TICK, false);
-		}
-		if (running && runTime <= 0)
-			running = false;
-		if (energy.getEnergyStored() < energy.getMaxEnergyStored()) {
-			if (!running && Utils.isBurnable(inventory[0])) {
-				runTime += Utils.getBurnTime(inventory[0]);
-				decrStackSize(0, 1);
-				running = true;
+		if (!worldObj.isRemote) {
+			System.out.println(running + " " + runTime);
+			if (running) {
+				energy.receiveEnergy(RF_PER_TICK, false);
+				runTime--;
 			}
+			if (running && runTime <= 0) {
+				System.out.println("stopping");
+				running = false;
+				worldObj.setBlockMetadataWithNotify(xCoord, yCoord, zCoord, getBlockMetadata() - 5, 3);
+				markDirty();
+			}
+			if (energy.getEnergyStored() < energy.getMaxEnergyStored()) {
+				if (!running && Utils.isBurnable(inventory[0])) {
+					runTime += Utils.getBurnTime(inventory[0]);
+					decrStackSize(0, 1);
+					running = true;
+					worldObj.setBlockMetadataWithNotify(xCoord, yCoord, zCoord, getBlockMetadata() + 5, 3);
+					markDirty();
+				}
 
+			}
 		}
+	}
+
+	public int extractEnergy(ForgeDirection from, int maxExtract, boolean simulate) {
+		return energy.extractEnergy(maxExtract, simulate);
+	}
+
+	public int getEnergyStored(ForgeDirection from) {
+		return energy.getEnergyStored();
+	}
+
+	public int getMaxEnergyStored(ForgeDirection from) {
+		return energy.getMaxEnergyStored();
 	}
 
 	@Override
